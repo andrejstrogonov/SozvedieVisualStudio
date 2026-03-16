@@ -10,6 +10,9 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Ищем Qt
 set(Qt6_DIR "C:/Qt/6.10.2/msvc2022_64/lib/cmake")
 find_package(Qt6 REQUIRED COMPONENTS Widgets Sql)
@@ -23,7 +26,7 @@ add_executable(SozvedieVisualStudio
     numericdelegate.h
     numericdelegate.cpp
     mainwindow.h
-    mainwindow.cpp
+    
 )
 
 # Линкуем Qt

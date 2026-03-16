@@ -7,9 +7,9 @@
 #include "database.h"
 
 
-int main()
+int main(int argc, char* argv[])
 {
-    QApplication app(argc, argv);
+    QApplication app(argc,argv);
 
     if (!Database::connect())
         return -1;
