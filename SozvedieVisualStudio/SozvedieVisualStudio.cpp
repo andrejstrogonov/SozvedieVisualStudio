@@ -2,11 +2,20 @@
 //
 
 #include "SozvedieVisualStudio.h"
+#include <QApplication>
+#include "mainwindow.h"
+#include "database.h"
 
-using namespace std;
 
 int main()
 {
-	cout << "Hello CMake." << endl;
-	return 0;
+    QApplication app(argc, argv);
+
+    if (!Database::connect())
+        return -1;
+
+    MainWindow w;
+    w.show();
+
+    return app.exec();
 }
