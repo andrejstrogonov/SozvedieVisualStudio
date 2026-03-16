@@ -26,6 +26,7 @@ add_executable(SozvedieVisualStudio
     numericdelegate.h
     numericdelegate.cpp
     mainwindow.h
+    mainwindow.cpp
     
 )
 
