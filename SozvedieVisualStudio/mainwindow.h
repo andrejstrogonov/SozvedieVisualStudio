@@ -2,9 +2,11 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QTreeWidget>
-#include <QTableWidget>
+#include <QTreeView>
+#include <QTableView>
+#include <QSqlTableModel>
 #include <QPushButton>
+#include <QModelIndex>
 
 class MainWindow : public QMainWindow
 {
@@ -15,8 +17,10 @@ public:
 
 private:
 
-    QTreeWidget* tree;
-    QTableWidget* table;
+    QTreeView* treeView;
+    QTableView* tableView;
+    QSqlTableModel* specModel;
+    QAbstractItemModel* treeModel;
 
     QPushButton* addObjectBtn;
     QPushButton* addTransmitterBtn;
@@ -30,11 +34,11 @@ private:
 
 private slots:
 
-    void onTreeChanged();
-    void onTableChanged(QTableWidgetItem*);
+    void onTreeChanged(const QModelIndex& index);  // ✅ Используем QModelIndex
+    void onTableChanged(const QModelIndex& index); // ✅ Используем QModelIndex
     void addObject();
     void addTransmitter();
     void deleteElement();
 };
 
-#endif
+#endif // MAINWINDOW_H

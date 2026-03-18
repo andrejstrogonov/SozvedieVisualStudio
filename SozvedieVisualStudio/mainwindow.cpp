@@ -1,6 +1,5 @@
 #include "mainwindow.h"
 #include "numericdelegate.h"
-
 #include <QtSql>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -11,6 +10,8 @@
 #include <QSqlError>
 #include <QSqlDatabase>
 #include <QPair>
+#include <QStandardItemModel>
+#include <QStandardItem>
 
 MainWindow::MainWindow()
 {
@@ -27,20 +28,20 @@ void MainWindow::createUI()
 
     QHBoxLayout* mainLayout = new QHBoxLayout;
 
-    tree = new QTreeWidget;
-    tree->setHeaderLabels({ "Objects","Coordinates" });
+    // Дерево объектов (QTreeView + QStandardItemModel)
+    treeView = new QTreeView;
+    treeModel = new QStandardItemModel;
+    treeView->setModel(treeModel);
+    treeView->setItemDelegate(new TreeModelDelegate(this));
+    treeView->setHeaderHidden(true);
 
-    connect(tree, &QTreeWidget::itemSelectionChanged,
-        this, &MainWindow::onTreeChanged);
+    // Таблица ТТХ (QTableView + QSqlTableModel)
+    tableView = new QTableView;
+    specModel = new QSqlTableModel;
+    tableView->setModel(specModel);
+    tableView->setItemDelegate(new NumericDelegate(this));
 
-    table = new QTableWidget(0, 2);
-    table->setHorizontalHeaderLabels({ "Parameter","Value" });
-    table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    table->setItemDelegate(new NumericDelegate(this));
-
-    connect(table, &QTableWidget::itemChanged,
-        this, &MainWindow::onTableChanged);
-
+    // Кнопки
     addObjectBtn = new QPushButton("Add Object");
     addTransmitterBtn = new QPushButton("Add Transmitter");
     deleteBtn = new QPushButton("Delete");
@@ -50,13 +51,13 @@ void MainWindow::createUI()
     connect(deleteBtn, &QPushButton::clicked, this, &MainWindow::deleteElement);
 
     QVBoxLayout* left = new QVBoxLayout;
-    left->addWidget(tree);
+    left->addWidget(treeView);
     left->addWidget(addObjectBtn);
     left->addWidget(addTransmitterBtn);
     left->addWidget(deleteBtn);
 
     QVBoxLayout* right = new QVBoxLayout;
-    right->addWidget(table);
+    right->addWidget(tableView);
 
     mainLayout->addLayout(left);
     mainLayout->addLayout(right);
@@ -68,7 +69,10 @@ void MainWindow::createUI()
 
 void MainWindow::loadTree()
 {
-    tree->clear();
+    treeModel->clear();
+    treeModel->setColumnCount(2);
+    treeModel->setHeaderData(0, Qt::Horizontal, "Имя");
+    treeModel->setHeaderData(1, Qt::Horizontal, "Координаты");
 
     QSqlQuery query("SELECT id, name, latitude, longitude FROM objects");
     while (query.next())
@@ -78,10 +82,13 @@ void MainWindow::loadTree()
         double lat = query.value(2).toDouble();
         double lon = query.value(3).toDouble();
 
-        QTreeWidgetItem* obj = new QTreeWidgetItem(tree);
-        obj->setText(0, name);
-        obj->setText(1, QString("(%1, %2)").arg(lat).arg(lon));
-        obj->setData(0, Qt::UserRole, QVariant::fromValue(qMakePair(QString("object"), objID)));
+        QStandardItem* objItem = new QStandardItem(name);
+        objItem->setData(QVariant::fromValue(qMakePair(QString("object"), objID)), Qt::UserRole);
+        objItem->setData(QString("(%1, %2)").arg(lat).arg(lon), Qt::DisplayRole);
+
+        QStandardItem* objNode = new QStandardItem("Объект");
+        objNode->setParent(objItem);
+        objNode->setFlags(objNode->flags() & ~Qt::ItemIsEditable);
 
         QSqlQuery tx;
         tx.prepare("SELECT id, name FROM transmitters WHERE object_id = :id");
@@ -93,37 +100,37 @@ void MainWindow::loadTree()
             int txID = tx.value(0).toInt();
             QString txName = tx.value(1).toString();
 
-            QTreeWidgetItem* t = new QTreeWidgetItem(obj);
-            t->setText(0, txName);
-            t->setData(0, Qt::UserRole, QVariant::fromValue(qMakePair(QString("transmitter"), txID)));
+            QStandardItem* txItem = new QStandardItem(txName);
+            txItem->setData(QVariant::fromValue(qMakePair(QString("transmitter"), txID)), Qt::UserRole);
+            txItem->setData(QString("Передатчик %1").arg(txID), Qt::DisplayRole);
 
-            QTreeWidgetItem* specsNode = new QTreeWidgetItem(t);
-            specsNode->setText(0, "ТТХ");
-            specsNode->setData(0, Qt::UserRole, QVariant::fromValue(qMakePair(QString("specs"), txID)));
+            QStandardItem* txNode = new QStandardItem("ТТХ");
+            txNode->setParent(txItem);
+            txNode->setFlags(txNode->flags() & ~Qt::ItemIsEditable);
+
+            treeModel->appendRow(objItem);
         }
     }
 }
 
-void MainWindow::onTreeChanged()
+void MainWindow::onTreeChanged(const QModelIndex& index)
 {
-    QList<QTreeWidgetItem*> selected = tree->selectedItems();
-    if (selected.isEmpty())
+    if (!index.isValid())
     {
-        table->setRowCount(0);
+        tableView->setRowCount(0);
         currentTransmitter = -1;
         return;
     }
 
-    QTreeWidgetItem* item = selected.first();
-    QVariant var = item->data(0, Qt::UserRole);
-    if (!var.canConvert<QPair<QString,int>>())
+    QVariant var = index.data(Qt::UserRole);
+    if (!var.canConvert<QPair<QString, int>>())
     {
-        table->setRowCount(0);
-        currentTransmitter = -1;
+        tableView->setRowCount(0);
+        currentTransmitter = -0;
         return;
     }
 
-    auto pair = var.value<QPair<QString,int>>();
+    auto pair = var.value<QPair<QString, int>>();
     QString type = pair.first;
     int id = pair.second;
 
@@ -134,20 +141,20 @@ void MainWindow::onTreeChanged()
     }
     else
     {
-        table->setRowCount(0);
+        tableView->setRowCount(0);
         currentTransmitter = -1;
     }
 }
 
-void MainWindow::onTableChanged(QTableWidgetItem* item)
+void MainWindow::onTableChanged(const QModelIndex& index)
 {
-    if (!item || item->column() != 1 || currentTransmitter == -1)
+    if (!index.isValid() || currentTransmitter == -1)
         return;
 
-    int row = item->row();
-    QString paramName = table->item(row, 0)->text();
+    QString paramName = specModel->headerData(index.row(), Qt::Horizontal).toString();
     bool ok;
-    double value = item->text().toDouble(&ok);
+    double value = specModel->data(index).toDouble(&ok);
+
     if (!ok)
     {
         QMessageBox::warning(this, "Ошибка", "Введите корректное числовое значение");
@@ -209,22 +216,22 @@ void MainWindow::addObject()
 
 void MainWindow::addTransmitter()
 {
-    QList<QTreeWidgetItem*> selected = tree->selectedItems();
+    QList<QModelIndex> selected = treeView->selectedIndexes();
     if (selected.isEmpty())
     {
         QMessageBox::warning(this, "Ошибка", "Выберите объект для добавления передатчика");
         return;
     }
 
-    QTreeWidgetItem* item = selected.first();
-    QVariant var = item->data(0, Qt::UserRole);
-    if (!var.canConvert<QPair<QString,int>>())
+    QModelIndex index = selected.first();
+    QVariant var = index.data(Qt::UserRole);
+    if (!var.canConvert<QPair<QString, int>>())
     {
         QMessageBox::warning(this, "Ошибка", "Выберите объект (не передатчик)");
         return;
     }
 
-    auto pair = var.value<QPair<QString,int>>();
+    auto pair = var.value<QPair<QString, int>>();
     if (pair.first != "object")
     {
         QMessageBox::warning(this, "Ошибка", "Выберите объект (не передатчик)");
@@ -273,19 +280,19 @@ void MainWindow::addTransmitter()
 
 void MainWindow::deleteElement()
 {
-    QList<QTreeWidgetItem*> selected = tree->selectedItems();
+    QList<QModelIndex> selected = treeView->selectedIndexes();
     if (selected.isEmpty())
     {
         QMessageBox::warning(this, "Ошибка", "Выберите элемент для удаления");
         return;
     }
 
-    QTreeWidgetItem* item = selected.first();
-    QVariant var = item->data(0, Qt::UserRole);
-    if (!var.canConvert<QPair<QString,int>>())
+    QModelIndex index = selected.first();
+    QVariant var = index.data(Qt::UserRole);
+    if (!var.canConvert<QPair<QString, int>>())
         return;
 
-    auto pair = var.value<QPair<QString,int>>();
+    auto pair = var.value<QPair<QString, int>>();
     QString type = pair.first;
     int id = pair.second;
 
@@ -312,7 +319,7 @@ void MainWindow::deleteElement()
     if (query.exec())
     {
         loadTree();
-        table->setRowCount(0);
+        tableView->setRowCount(0);
         currentTransmitter = -1;
     }
     else
@@ -323,37 +330,18 @@ void MainWindow::deleteElement()
 
 void MainWindow::loadSpecs(int transmitterID)
 {
-    table->blockSignals(true);
-    table->setRowCount(0);
+    specModel->setTable("specs");
+    specModel->setFilter(QString("transmitter_id = %1").arg(transmitterID));
+    specModel->select();
 
-    QSqlQuery query;
-    query.prepare("SELECT power_watt, gain_db, antenna_height FROM specs WHERE transmitter_id = :id");
-    query.bindValue(":id", transmitterID);
-
-    if (query.exec() && query.next())
+    if (specModel->rowCount() > 0)
     {
-        double power = query.value(0).toDouble();
-        double gain = query.value(1).toDouble();
-        double height = query.value(2).toDouble();
-
-        QStringList params = { "Мощность (Вт)", "КУ (дБ)", "Высота подвеса (м)" };
-        QVector<double> values = { power, gain, height };
-
-        table->setRowCount(params.size());
-        for (int row = 0; row < params.size(); ++row)
-        {
-            QTableWidgetItem* paramItem = new QTableWidgetItem(params[row]);
-            paramItem->setFlags(paramItem->flags() & ~Qt::ItemIsEditable);
-            table->setItem(row, 0, paramItem);
-
-            QTableWidgetItem* valueItem = new QTableWidgetItem(QString::number(values[row]));
-            table->setItem(row, 1, valueItem);
-        }
+        tableView->setRowCount(specModel->rowCount());
+        tableView->setColumnCount(2);
+        tableView->setHorizontalHeaderLabels({ "Parameter", "Value" });
     }
     else
     {
-        table->setRowCount(0);
+        tableView->setRowCount(0);
     }
-
-    table->blockSignals(false);
 }

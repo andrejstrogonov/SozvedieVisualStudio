@@ -6,7 +6,7 @@ bool Database::connect()
     QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL");
 
     db.setHostName("localhost");
-    db.setDatabaseName("mydb");
+    db.setDatabaseName("mydb_astra");
     db.setUserName("postgres");
     db.setPassword("postgres");
     db.setPort(5432);
