@@ -1,145 +1,300 @@
 import QtQuick 2.15
-import QtQuick.Window 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Dialogs 1.3
+import AppModels 1.0
 
-Window {
+ApplicationWindow {
+    visible: true
     width: 1200
     height: 700
     title: "Менеджер объектов и ТТХ"
-    resizeMode: Window.NoResize
 
-    // Панель навигации (Дерево)
-    ColumnLayout {
-        id: treePanel
-        width: parent.width
-        height: parent.height
+    // Модели доступны из контекста: treeModel, specModel
 
-        // Заголовок
-        Text {
-            text: "Дерево объектов"
-            font.bold: true
-            font.pointSize: 16
-            Layout.preferredHeight: 30
-        }
+    RowLayout {
+        anchors.fill: parent
+        spacing: 5
 
-        // Дерево
-        TreeView {
-            id: treeView
-            width: parent.width
-            height: parent.height - 100
+        // Левая панель – дерево
+        Pane {
+            Layout.preferredWidth: 300
+            Layout.fillHeight: true
+            padding: 0
 
-            model: treeModel
-            clip: true
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 5
 
-            // Настройка колонок
-            columnWidths: ["200", "100"]
-            header: TreeViewHeader {
-                visible: false
-            }
-
-            // Делегат для узлов
-            delegate: ItemDelegate {
-                width: parent.width
-                text: "Имя"
-                contentItem: Text {
-                    text: item.name
+                Label {
+                    text: "Дерево объектов"
                     font.bold: true
+                    font.pointSize: 14
+                    Layout.alignment: Qt.AlignHCenter
                 }
-                background: Rectangle {
-                    color: "lightblue"
-                }
-            }
 
-            // Событие выбора элемента
-            onSelectionChanged: {
-                if (selectedItem) {
-                    if (selectedItem.type === "object") {
-                        loadSpecs(selectedItem.id)
-                    } else if (selectedItem.type === "transmitter") {
-                        loadSpecs(selectedItem.id)
+                TreeView {
+                    id: treeView
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    model: treeModel
+
+                    delegate: ItemDelegate {
+                        width: parent.width
+                        text: model.name
+                        icon.source: model.iconSource
+                        onClicked: {
+                            if (model.type === "transmitter")
+                                specModel.setTransmitterId(model.id)
+                            else
+                                specModel.setTransmitterId(-1)
+                        }
+                    }
+
+                    // Раскрыть всё при загрузке
+                    Component.onCompleted: expandAll()
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Button {
+                        text: "Добавить объект"
+                        Layout.fillWidth: true
+                        onClicked: addObjectDialog.open()
+                    }
+
+                    Button {
+                        text: "Добавить передатчик"
+                        Layout.fillWidth: true
+                        onClicked: {
+                            var idx = treeView.currentIndex
+                            if (idx.valid && treeModel.data(idx, ObjectTreeModel.TypeRole) === "object") {
+                                addTransmitterDialog.objectId = treeModel.data(idx, ObjectTreeModel.IdRole)
+                                addTransmitterDialog.open()
+                            } else {
+                                messageDialog.show("Выберите объект в дереве")
+                            }
+                        }
+                    }
+
+                    Button {
+                        text: "Удалить"
+                        Layout.fillWidth: true
+                        onClicked: {
+                            var idx = treeView.currentIndex
+                            if (idx.valid) {
+                                deleteConfirmDialog.index = idx
+                                deleteConfirmDialog.open()
+                            } else {
+                                messageDialog.show("Выберите элемент для удаления")
+                            }
+                        }
                     }
                 }
             }
         }
 
-        // Кнопки управления
-        RowLayout {
-            spacing: 10
+        // Правая панель – таблица ТТХ
+        Pane {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            padding: 0
 
-            Button {
-                text: "Добавить объект"
-                onClicked: addObject()
-            }
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 5
 
-            Button {
-                text: "Добавить передатчик"
-                onClicked: addTransmitter()
-            }
+                Label {
+                    text: "Таблица ТТХ"
+                    font.bold: true
+                    font.pointSize: 14
+                    Layout.alignment: Qt.AlignHCenter
+                }
 
-            Button {
-                text: "Удалить"
-                onClicked: deleteElement()
+                TableView {
+                    id: tableView
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    model: specModel
+                    clip: true
+
+                    columnWidthProvider: function(column) {
+                        return column === 0 ? 150 : 100
+                    }
+
+                    delegate: Rectangle {
+                        implicitHeight: 30
+                        color: "transparent"
+
+                        Text {
+                            anchors.fill: parent
+                            anchors.margins: 4
+                            verticalAlignment: Text.AlignVCenter
+                            text: display
+                            visible: !editing
+                        }
+
+                        TextField {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            text: display
+                            visible: editing
+                            validator: DoubleValidator { bottom: -1e9; top: 1e9; decimals: 2 }
+                            onEditingFinished: {
+                                model.display = text  // через роль display (setData)
+                                editing = false
+                            }
+                            onVisibleChanged: if (visible) forceActiveFocus()
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                if (column === 1) {
+                                    editing = true
+                                }
+                            }
+                        }
+
+                        property bool editing: false
+                    }
+                }
             }
         }
     }
 
-    // Панель редактирования (Таблица ТТХ)
-    ColumnLayout {
-        id: tablePanel
-        width: parent.width
-        height: parent.height
+    // Диалоги
+    MessageDialog {
+        id: messageDialog
+        title: "Информация"
+        icon: StandardIcon.Information
+        standardButtons: StandardButton.Ok
+        function show(msg) { text = msg; open() }
+    }
 
-        // Заголовок
-        Text {
-            text: "Таблица ТТХ"
-            font.bold: true
-            font.pointSize: 16
-            Layout.preferredHeight: 30
+    Dialog {
+        id: addObjectDialog
+        title: "Добавить объект"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        width: 300
+
+        property string name
+        property double lat
+        property double lon
+        property string iconPath
+
+        contentItem: ColumnLayout {
+            spacing: 8
+            TextField {
+                Layout.fillWidth: true
+                placeholderText: "Название"
+                onTextChanged: addObjectDialog.name = text
+            }
+            TextField {
+                Layout.fillWidth: true
+                placeholderText: "Широта"
+                validator: DoubleValidator { bottom: -90; top: 90; decimals: 6 }
+                onTextChanged: addObjectDialog.lat = parseFloat(text)
+            }
+            TextField {
+                Layout.fillWidth: true
+                placeholderText: "Долгота"
+                validator: DoubleValidator { bottom: -180; top: 180; decimals: 6 }
+                onTextChanged: addObjectDialog.lon = parseFloat(text)
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                TextField {
+                    id: iconField
+                    Layout.fillWidth: true
+                    placeholderText: "Путь к иконке"
+                    readOnly: true
+                    text: addObjectDialog.iconPath
+                }
+                Button {
+                    text: "..."
+                    onClicked: fileDialog.open()
+                }
+            }
         }
 
-        // Таблица
-        TableView {
-            id: tableView
-            width: parent.width
-            height: parent.height - 100
+        onAccepted: {
+            treeModel.addObject(name, lat, lon, iconPath)
+        }
+    }
 
-            model: specModel
-            clip: true
+    Dialog {
+        id: addTransmitterDialog
+        title: "Добавить передатчик"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        width: 300
 
-            // Настройка колонок
-            columnWidths: ["200", "100"]
-            header: TableViewHeader {
-                visible: true
+        property int objectId: -1
+        property string name
+        property string iconPath
+
+        contentItem: ColumnLayout {
+            spacing: 8
+            TextField {
+                Layout.fillWidth: true
+                placeholderText: "Название передатчика"
+                onTextChanged: addTransmitterDialog.name = text
             }
-
-            // Делегат для редактирования чисел
-            delegate: ItemDelegate {
-                width: parent.width
-                text: "Значение"
-                contentItem: Text {
-                    text: model.value
-                    font.bold: true
+            RowLayout {
+                Layout.fillWidth: true
+                TextField {
+                    id: txIconField
+                    Layout.fillWidth: true
+                    placeholderText: "Путь к иконке"
+                    readOnly: true
+                    text: addTransmitterDialog.iconPath
                 }
-                background: Rectangle {
-                    color: "lightgray"
-                }
-
-                // Поверхность для редактирования
-                contentItem: TextInput {
-                    text: model.value
-                    onAccepted: {
-                        model.value = text
-                    }
-                }
-            }
-
-            // Событие изменения ячейки
-            onSelectionChanged: {
-                if (selectedItem) {
-                    updateSpecs(selectedItem.row, selectedItem.column)
+                Button {
+                    text: "..."
+                    onClicked: fileDialog.openForTransmitter()
                 }
             }
+        }
+
+        onAccepted: {
+            if (objectId !== -1 && name !== "")
+                treeModel.addTransmitter(objectId, name, iconPath)
+        }
+    }
+
+    FileDialog {
+        id: fileDialog
+        title: "Выберите иконку"
+        nameFilters: ["Images (*.png *.jpg *.jpeg *.bmp *.svg)"]
+        folder: shortcuts.pictures
+        function openForTransmitter() {
+            fileDialog.forObject = false
+            fileDialog.open()
+        }
+        property bool forObject: true
+        onAccepted: {
+            var path = fileUrl.toString().replace("file:///", "")
+            if (forObject) {
+                addObjectDialog.iconPath = path
+                iconField.text = path
+            } else {
+                addTransmitterDialog.iconPath = path
+                txIconField.text = path
+            }
+        }
+    }
+
+    MessageDialog {
+        id: deleteConfirmDialog
+        title: "Подтверждение"
+        icon: StandardIcon.Question
+        standardButtons: StandardButton.Yes | StandardButton.No
+        property var index
+        function open(idx) { index = idx; super.open() }
+        onYes: {
+            treeModel.deleteItem(index)
+            specModel.setTransmitterId(-1)
         }
     }
 }
