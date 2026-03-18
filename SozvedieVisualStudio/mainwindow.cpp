@@ -13,6 +13,8 @@
 #include <QStandardItem>
 #include <QItemSelectionModel>
 #include <QIcon>                  // для работы с иконками
+#include <QFileDialog>
+#include <QStandardPaths>
 
 // ====================== SpecTableModel ======================
 SpecTableModel::SpecTableModel(QObject* parent)
@@ -396,4 +398,109 @@ void MainWindow::deleteElement()
 void MainWindow::loadSpecs(int transmitterID)
 {
 	specModel->setTransmitterId(transmitterID);
+}
+
+void MainWindow::addObject()
+{
+	bool ok;
+	QString name = QInputDialog::getText(this, "Добавить объект", "Введите имя объекта:", QLineEdit::Normal, "", &ok);
+	if (!ok || name.isEmpty())
+		return;
+
+	double lat = QInputDialog::getDouble(this, "Координаты", "Широта:", 0, -90, 90, 4, &ok);
+	if (!ok)
+		return;
+	double lon = QInputDialog::getDouble(this, "Координаты", "Долгота:", 0, -180, 180, 4, &ok);
+	if (!ok)
+		return;
+
+	// --- Выбор иконки ---
+	QString iconPath = QFileDialog::getOpenFileName(this,
+		tr("Выберите иконку для объекта"),
+		QStandardPaths::writableLocation(QStandardPaths::PicturesLocation), // стартовая папка
+		tr("Images (*.png *.jpg *.jpeg *.bmp *.svg)"));
+	// Если пользователь нажал "Отмена", iconPath будет пустым — это допустимо
+
+	QSqlQuery query;
+	query.prepare("INSERT INTO objects (name, latitude, longitude, icon_path) VALUES (:name, :lat, :lon, :icon)");
+	query.bindValue(":name", name);
+	query.bindValue(":lat", lat);
+	query.bindValue(":lon", lon);
+	query.bindValue(":icon", iconPath.isEmpty() ? QVariant(QVariant::String) : iconPath);
+	// Если путь пустой, передаём NULL, иначе строку
+
+	if (query.exec()) {
+		loadTree();
+	}
+	else {
+		QMessageBox::critical(this, "Ошибка", "Не удалось добавить объект: " + query.lastError().text());
+	}
+}
+
+void MainWindow::addTransmitter()
+{
+	QList<QModelIndex> selected = treeView->selectionModel()->selectedIndexes();
+	if (selected.isEmpty()) {
+		QMessageBox::warning(this, "Ошибка", "Выберите объект для добавления передатчика");
+		return;
+	}
+
+	QModelIndex index = selected.first();
+	QVariant var = index.data(Qt::UserRole);
+	if (!var.canConvert<QPair<QString, int>>()) {
+		QMessageBox::warning(this, "Ошибка", "Выберите объект (не передатчик)");
+		return;
+	}
+
+	auto pair = var.value<QPair<QString, int>>();
+	if (pair.first != "object") {
+		QMessageBox::warning(this, "Ошибка", "Выберите объект (не передатчик)");
+		return;
+	}
+
+	int objectId = pair.second;
+
+	bool ok;
+	QString name = QInputDialog::getText(this, "Добавить передатчик", "Введите имя передатчика:", QLineEdit::Normal, "", &ok);
+	if (!ok || name.isEmpty())
+		return;
+
+	// --- Выбор иконки ---
+	QString iconPath = QFileDialog::getOpenFileName(this,
+		tr("Выберите иконку для передатчика"),
+		QStandardPaths::writableLocation(QStandardPaths::PicturesLocation),
+		tr("Images (*.png *.jpg *.jpeg *.bmp *.svg)"));
+
+	QSqlDatabase::database().transaction();
+
+	QSqlQuery query;
+	query.prepare("INSERT INTO transmitters (object_id, name, icon_path) VALUES (:obj, :name, :icon)");
+	query.bindValue(":obj", objectId);
+	query.bindValue(":name", name);
+	query.bindValue(":icon", iconPath.isEmpty() ? QVariant(QVariant::String) : iconPath);
+
+	if (query.exec())
+	{
+		int txId = query.lastInsertId().toInt();
+
+		QSqlQuery specQuery;
+		specQuery.prepare("INSERT INTO specs (transmitter_id, power_watt, gain_db, antenna_height) VALUES (:id, 0.0, 0.0, 0.0)");
+		specQuery.bindValue(":id", txId);
+
+		if (specQuery.exec())
+		{
+			QSqlDatabase::database().commit();
+			loadTree();
+		}
+		else
+		{
+			QSqlDatabase::database().rollback();
+			QMessageBox::critical(this, "Ошибка", "Не удалось создать ТТХ для передатчика: " + specQuery.lastError().text());
+		}
+	}
+	else
+	{
+		QSqlDatabase::database().rollback();
+		QMessageBox::critical(this, "Ошибка", "Не удалось добавить передатчик: " + query.lastError().text());
+	}
 }
