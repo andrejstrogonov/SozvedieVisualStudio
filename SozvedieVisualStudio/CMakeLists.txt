@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Ищем Qt
 set(Qt6_DIR "C:/Qt/6.10.2/msvc2022_64/lib/cmake")
-find_package(Qt6 REQUIRED COMPONENTS Widgets Sql)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Sql Gui)
 
 # Создаем исполняемый файл
 add_executable(SozvedieVisualStudio
@@ -32,6 +32,9 @@ add_executable(SozvedieVisualStudio
 
 # Линкуем Qt
 target_link_libraries(SozvedieVisualStudio
-    Qt6::Widgets
+    Qt6::Core
+    Qt6::Qml
+    Qt6::Quick
     Qt6::Sql
+    Qt6::Gui
 )

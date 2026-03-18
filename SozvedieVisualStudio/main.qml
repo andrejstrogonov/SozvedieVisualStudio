@@ -7,8 +7,6 @@ Window {
     width: 1200
     height: 700
     title: "Менеджер объектов и ТТХ"
-
-    // Блокировка ресайза
     resizeMode: Window.NoResize
 
     // Панель навигации (Дерево)
@@ -54,7 +52,7 @@ Window {
             }
 
             // Событие выбора элемента
-            onCurrentItemChanged: {
+            onSelectionChanged: {
                 if (selectedItem) {
                     if (selectedItem.type === "object") {
                         loadSpecs(selectedItem.id)
@@ -137,7 +135,7 @@ Window {
             }
 
             // Событие изменения ячейки
-            onCurrentItemChanged: {
+            onSelectionChanged: {
                 if (selectedItem) {
                     updateSpecs(selectedItem.row, selectedItem.column)
                 }
