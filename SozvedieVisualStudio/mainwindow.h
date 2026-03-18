@@ -7,12 +7,17 @@
 #include <QPushButton>
 #include <QStandardItemModel>
 #include <QAbstractTableModel>
-#include <QItemDelegate>          // обязательно для базового класса
-#include <QStyledItemDelegate>    // (можно использовать и его, но для совместимости оставим QItemDelegate)
+#include <QItemDelegate>
+#include <QStyledItemDelegate>
+#include <QPair>                // добавлено для использования QPair
+#include <QMetaType>             // для Q_DECLARE_METATYPE
+
+// Объявляем метатип для QPair<QString,int>, чтобы он корректно работал с QVariant
+Q_DECLARE_METATYPE(QPair<QString, int>)
 
 // Делегат для дерева (запрещает редактирование элементов с пользовательскими данными)
 class TreeModelDelegate : public QItemDelegate {
-	Q_OBJECT   // ← добавляем макрос, чтобы MOC сгенерировал метаинформацию
+	Q_OBJECT
 public:
 	explicit TreeModelDelegate(QObject* parent = nullptr)
 		: QItemDelegate(parent)
@@ -27,7 +32,7 @@ public:
 		if (index.data(Qt::UserRole).canConvert<QPair<QString, int>>()) {
 			return nullptr;
 		}
-		// Иначе используем стандартный редактор (например, для обычных текстовых элементов)
+		// Иначе используем стандартный редактор
 		return QItemDelegate::createEditor(parent, option, index);
 	}
 };
@@ -38,7 +43,6 @@ class SpecTableModel : public QAbstractTableModel {
 public:
 	explicit SpecTableModel(QObject* parent = nullptr);
 
-	// Задать ID передатчика и загрузить его характеристики из БД
 	void setTransmitterId(int id);
 
 	int rowCount(const QModelIndex& parent = QModelIndex()) const override;
@@ -50,9 +54,9 @@ public:
 
 private:
 	struct SpecItem {
-		QString name;       // Отображаемое имя параметра
-		double value;       // Текущее значение
-		QString fieldName;  // Имя поля в таблице БД (для обновления)
+		QString name;
+		double value;
+		QString fieldName;
 	};
 	QVector<SpecItem> m_specs;
 	int m_transmitterId;
@@ -66,25 +70,25 @@ public:
 	MainWindow();
 
 private slots:
-	void onTreeClicked(const QModelIndex& index);   // обработчик клика по дереву
+	void onTreeClicked(const QModelIndex& index);
 	void addObject();
 	void addTransmitter();
 	void deleteElement();
 
 private:
 	void createUI();
-	void loadTree();               // загружает данные в дерево из БД
-	void loadSpecs(int transmitterID); // загружает ТТХ конкретного передатчика
+	void loadTree();               // загружает данные в дерево из БД (теперь с иконками)
+	void loadSpecs(int transmitterID);
 
 	QTreeView* treeView;
 	QTableView* tableView;
 	QStandardItemModel* treeModel;
-	SpecTableModel* specModel;      // кастомная модель для таблицы ТТХ
+	SpecTableModel* specModel;
 	QPushButton* addObjectBtn;
 	QPushButton* addTransmitterBtn;
 	QPushButton* deleteBtn;
 
-	int currentTransmitter;          // ID текущего выбранного передатчика (или -1)
+	int currentTransmitter;
 };
 
 #endif // MAINWINDOW_H
