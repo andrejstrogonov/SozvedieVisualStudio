@@ -2,14 +2,18 @@
 //
 
 #include "SozvedieVisualStudio.h"
-#include <QApplication>
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
 #include "mainwindow.h"
 #include "database.h"
 
 
 int main(int argc, char* argv[])
 {
-    QApplication app(argc,argv);
+    QGuiApplication app(argc, argv);
+
+    QQmlApplicationEngine engine;
+    engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
 
     if (!Database::connect())
         return -1;
