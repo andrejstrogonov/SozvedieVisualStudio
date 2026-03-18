@@ -3,8 +3,7 @@
 
 #include <QStyledItemDelegate>
 
-class NumericDelegate : public QStyledItemDelegate
-{
+class NumericDelegate : public QStyledItemDelegate {
     Q_OBJECT
 
 public:
@@ -22,4 +21,4 @@ public:
         const QModelIndex& index) const override;
 };
 
-#endif
+#endif // NUMERICDELEGATE_H

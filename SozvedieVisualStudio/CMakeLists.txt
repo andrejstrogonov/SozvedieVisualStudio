@@ -15,15 +15,13 @@ set(CMAKE_AUTORCC ON)
 set(Qt6_DIR "C:/Qt/6.10.2/msvc2022_64/lib/cmake")
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Sql Widgets Gui)
 
-# Перечисляем исходники проекта
+# Перечисляем исходники проекта (только .cpp файлы)
 add_executable(SozvedieVisualStudio
     SozvedieVisualStudio.cpp
-    SozvedieVisualStudio.h
-    numericdelegate.h
-    numericdelegate.cpp
-    mainwindow.h
     mainwindow.cpp
-    database.h
+    numericdelegate.cpp
+    specmodel.cpp
+    treemodel.cpp
     database.cpp
 )
 
