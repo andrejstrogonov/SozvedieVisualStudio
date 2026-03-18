@@ -336,12 +336,11 @@ void MainWindow::loadSpecs(int transmitterID)
 
     if (specModel->rowCount() > 0)
     {
-        tableView->setRowCount(specModel->rowCount());
         tableView->setColumnCount(2);
         tableView->setHorizontalHeaderLabels({ "Параметр", "Значение" });
     }
     else
     {
-        tableView->setRowCount(0);
+        tableView->setColumnCount(0);
     }
 }
