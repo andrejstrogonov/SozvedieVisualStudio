@@ -23,7 +23,7 @@ add_executable(SozvedieVisualStudio
     specmodel.cpp
     treemodel.cpp
     database.cpp
-)
+ "treeview.cpp" "treeview.h")
 
 # Линкуем Qt компоненты
 target_link_libraries(SozvedieVisualStudio
