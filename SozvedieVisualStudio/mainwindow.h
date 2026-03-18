@@ -9,10 +9,10 @@
 #include <QAbstractTableModel>
 #include <QItemDelegate>
 #include <QStyledItemDelegate>
-#include <QPair>                // добавлено для использования QPair
-#include <QMetaType>             // для Q_DECLARE_METATYPE
+#include <QPair>
+#include <QMetaType>
 
-// Объявляем метатип для QPair<QString,int>, чтобы он корректно работал с QVariant
+// Объявляем метатип для QPair<QString,int>, чтобы он работал с QVariant
 Q_DECLARE_METATYPE(QPair<QString, int>)
 
 // Делегат для дерева (запрещает редактирование элементов с пользовательскими данными)
@@ -28,7 +28,7 @@ public:
 		const QStyleOptionViewItem& option,
 		const QModelIndex& index) const override
 	{
-		// Если в элементе есть пользовательские данные (object/transmitter) — запрещаем редактирование
+		// Если в элементе есть наши данные (object/transmitter) — запрещаем редактирование
 		if (index.data(Qt::UserRole).canConvert<QPair<QString, int>>()) {
 			return nullptr;
 		}
@@ -54,9 +54,9 @@ public:
 
 private:
 	struct SpecItem {
-		QString name;
-		double value;
-		QString fieldName;
+		QString name;       // Отображаемое имя параметра
+		double value;       // Текущее значение
+		QString fieldName;  // Имя поля в таблице БД (для обновления)
 	};
 	QVector<SpecItem> m_specs;
 	int m_transmitterId;
@@ -70,25 +70,25 @@ public:
 	MainWindow();
 
 private slots:
-	void onTreeClicked(const QModelIndex& index);
+	void onTreeClicked(const QModelIndex& index);   // обработчик клика по дереву
 	void addObject();
 	void addTransmitter();
 	void deleteElement();
 
 private:
 	void createUI();
-	void loadTree();               // загружает данные в дерево из БД (теперь с иконками)
+	void loadTree();               // загружает данные в дерево из БД (с иконками)
 	void loadSpecs(int transmitterID);
 
 	QTreeView* treeView;
 	QTableView* tableView;
 	QStandardItemModel* treeModel;
-	SpecTableModel* specModel;
+	SpecTableModel* specModel;      // кастомная модель для таблицы ТТХ
 	QPushButton* addObjectBtn;
 	QPushButton* addTransmitterBtn;
 	QPushButton* deleteBtn;
 
-	int currentTransmitter;
+	int currentTransmitter;          // ID текущего выбранного передатчика (или -1)
 };
 
 #endif // MAINWINDOW_H
